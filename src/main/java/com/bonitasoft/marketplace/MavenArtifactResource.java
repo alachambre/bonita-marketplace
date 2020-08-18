@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.UUID;
 
 import javax.inject.Inject;
-import javax.ws.rs.BadRequestException;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -31,28 +30,25 @@ public class MavenArtifactResource {
     @POST
     public Response index(MavenArtifact mavenArtifact) throws IOException {
         if (mavenArtifact.id == null) {
-            mavenArtifact.id = UUID.randomUUID().toString(); // TODO ensure unicity ? 
+            mavenArtifact.id = UUID.randomUUID().toString();
         }
         mavenArtifactService.index(mavenArtifact);
-        return Response.created(URI.create("/maven-artifact/" + mavenArtifact.id)).build();
+        return Response.created(URI.create("/" + mavenArtifact.type + "/" + mavenArtifact.id)).build();
     }
 
     @GET
-    @Path("/{id}")
-    public MavenArtifact get(@PathParam("id") String id) throws IOException {
-        return mavenArtifactService.get(id);
+    @Path("/{type}/{id}")
+    public MavenArtifact get(@PathParam("type") String type, @PathParam("id") String id) throws IOException {
+        return mavenArtifactService.get(id, type);
     }
 
     @GET
-    @Path("/search")
-    public List<MavenArtifact> search(@QueryParam("name") String name, @QueryParam("groupId") String groupId)
+    @Path("/search/{type}")
+    public List<MavenArtifact> search(@PathParam("type") String type, @QueryParam("searchContent") String searchContent)
             throws IOException {
-        if (name != null) {
-            return mavenArtifactService.searchByName(name);
-        } else if (groupId != null) {
-            return mavenArtifactService.searchByGroupId(groupId);
-        } else {
-            throw new BadRequestException("Should provide name or groupId query parameter");
+        if (searchContent != null && !searchContent.isEmpty()) {
+            return mavenArtifactService.search(type, searchContent);
         }
+        return mavenArtifactService.search(type);
     }
 }

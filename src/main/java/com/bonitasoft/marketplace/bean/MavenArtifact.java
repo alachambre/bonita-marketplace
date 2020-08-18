@@ -19,6 +19,7 @@ public class MavenArtifact {
     public String id;
     public String name;
     public String description;
+    public String type;
     public String groupId;
     public String artifactId;
     public String version;
