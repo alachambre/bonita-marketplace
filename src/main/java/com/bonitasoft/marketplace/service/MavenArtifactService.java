@@ -37,9 +37,17 @@ public class MavenArtifactService {
     @Inject
     RestClient restClient;
 
-    public void index(MavenArtifact mavenArtifact) throws IOException {
+    public Response index(MavenArtifact mavenArtifact) throws IOException {
         Request request = new Request(
                 "PUT",
+                "/" + mavenArtifact.type + "/_doc/" + mavenArtifact.id);
+        request.setJsonEntity(JsonObject.mapFrom(mavenArtifact).toString());
+        return restClient.performRequest(request);
+    }
+
+    public void delete(MavenArtifact mavenArtifact) throws IOException {
+        Request request = new Request(
+                "DELETE",
                 "/" + mavenArtifact.type + "/_doc/" + mavenArtifact.id);
         request.setJsonEntity(JsonObject.mapFrom(mavenArtifact).toString());
         restClient.performRequest(request);
@@ -56,19 +64,28 @@ public class MavenArtifactService {
     }
 
     public List<MavenArtifact> search(String type, String searchContent) throws IOException {
+        Request request = createSearchRequest(type);
+        JsonObject queryJson = createSearchWithContentQuery(searchContent);
+        String responseBody = performRequest(request, queryJson);
+        return parseResponseBody(responseBody);
+    }
+
+    protected Request createSearchRequest(String type) {
         Request request = new Request(
                 "GET",
                 "/" + type + "/_search");
+        return request;
+    }
 
+    protected JsonObject createSearchWithContentQuery(String searchContent) {
         /**
-         * Construct a JSON querry like that:
+         * Construct a JSON query like that:
          * {
          * "query": {
          * "multi_match" : {
          * "query": <user input>,
          * "fields": [ "name", "description" ]}}}
          */
-
         JsonArray fields = new JsonArray();
         fields.add("name");
         fields.add("description");
@@ -77,25 +94,19 @@ public class MavenArtifactService {
         termJson.put("type", "best_fields");
         JsonObject matchJson = new JsonObject().put("multi_match", termJson);
         JsonObject queryJson = new JsonObject().put("query", matchJson);
-
-        return performRequest(request, queryJson);
+        return queryJson;
     }
 
     public List<MavenArtifact> search(String type) throws IOException {
-        Request request = new Request(
-                "GET",
-                "/" + type + "/_search");
+        Request request = createSearchRequest(type);
 
         JsonObject matchJson = new JsonObject().put("match_all", new JsonObject());
         JsonObject queryJson = new JsonObject().put("query", matchJson);
-        return performRequest(request, queryJson);
+        String responseBody = performRequest(request, queryJson);
+        return parseResponseBody(responseBody);
     }
 
-    private List<MavenArtifact> performRequest(Request request, JsonObject queryJson) throws IOException {
-        request.setJsonEntity(queryJson.encode());
-        Response response = restClient.performRequest(request);
-        String responseBody = EntityUtils.toString(response.getEntity());
-
+    private List<MavenArtifact> parseResponseBody(String responseBody) {
         JsonObject json = new JsonObject(responseBody);
         JsonArray hits = json.getJsonObject("hits").getJsonArray("hits");
         List<MavenArtifact> results = new ArrayList<>(hits.size());
@@ -105,6 +116,12 @@ public class MavenArtifactService {
             results.add(artifact);
         }
         return results;
+    }
+
+    protected String performRequest(Request request, JsonObject queryJson) throws IOException {
+        request.setJsonEntity(queryJson.encode());
+        Response response = restClient.performRequest(request);
+        return EntityUtils.toString(response.getEntity());
     }
 
 }
